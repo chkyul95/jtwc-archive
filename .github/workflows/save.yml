@@ -1,0 +1,110 @@
+name: Archive & Save JTWC Bulletins
+
+on:
+  schedule:
+    - cron: '34 1,4,7,10,13,16,19,22 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  archive-and-download:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download bulletins and check for updates
+        id: process_bulletins
+        env:
+          IA_ACCESS_KEY: ${{ secrets.IA_ACCESS_KEY }}
+          IA_SECRET_KEY: ${{ secrets.IA_SECRET_KEY }}
+        run: |
+          mkdir -p temp_downloads
+          
+          TARGETS=()
+          TARGETS+=("ab:abpw10")
+          for i in {1..6}; do
+            TARGETS+=("wt:wtpn3${i}")  # TC Warning
+            TARGETS+=("wd:wdpn3${i}")  # Prognostic Reasoning
+            TARGETS+=("wt:wtpn2${i}")  # TCFA
+          done
+
+          YEAR=$(date -u +'%Y')
+          MONTH=$(date -u +'%m')
+          TIMESTAMP=$(date -u +'%Y%m%d_%H%M%S')
+
+          UPDATED_COUNT=0
+          UPDATED_PRODUCTS=()
+
+          for item in "${TARGETS[@]}"; do
+            SUBDIR="${item%%:*}"
+            PROD="${item##*:}"
+            
+            TARGET_URL="https://tgftp.nws.noaa.gov/data/raw/${SUBDIR}/${PROD}.pgtw..txt"
+            TEMP_FILE="temp_downloads/${PROD}.txt"
+            PROD_DIR="data/${PROD}"
+            LATEST_FILE="${PROD_DIR}/latest.txt"
+
+            if ! curl -fsSL "$TARGET_URL" -o "$TEMP_FILE"; then
+              echo "[-] ${PROD}: File not found or network issue. Skipping."
+              rm -f "$TEMP_FILE"
+              continue
+            fi
+
+            mkdir -p "$PROD_DIR"
+            if [ -f "$LATEST_FILE" ] && cmp -s "$TEMP_FILE" "$LATEST_FILE"; then
+              echo "[-] ${PROD}: No changes. Skipping."
+              rm -f "$TEMP_FILE"
+            else
+              echo "[+] ${PROD}: Update detected!"
+              
+              ARCHIVE_DIR="${PROD_DIR}/${YEAR}/${MONTH}"
+              mkdir -p "$ARCHIVE_DIR"
+              
+              FILE_PATH="${ARCHIVE_DIR}/${PROD}_${TIMESTAMP}.txt"
+              mv "$TEMP_FILE" "$FILE_PATH"
+              cp "$FILE_PATH" "$LATEST_FILE"
+
+              echo "    Requesting Wayback Machine archive for ${PROD}..."
+              IA_RES=$(curl -sSL --max-time 30 -X POST "https://web.archive.org/save" \
+                -H "Accept: application/json" \
+                -H "Authorization: LOW ${IA_ACCESS_KEY}:${IA_SECRET_KEY}" \
+                --data-urlencode "url=${TARGET_URL}" \
+                -d "force_get=1" \
+                -d "capture_all=1" \
+                -d "skip_first_archive=1" || true)
+
+              echo "    Archive.org response: ${IA_RES}"
+              
+              UPDATED_COUNT=$((UPDATED_COUNT + 1))
+              UPDATED_PRODUCTS+=("${PROD}")
+              
+              sleep 1
+            fi
+          done
+
+          rm -rf temp_downloads
+
+          if [ "$UPDATED_COUNT" -gt 0 ]; then
+            echo "has_update=true" >> $GITHUB_OUTPUT
+            echo "updated_summary=${UPDATED_PRODUCTS[*]}" >> $GITHUB_OUTPUT
+            echo "Total updated: ${UPDATED_COUNT} bulletin(s)."
+          else
+            echo "has_update=false" >> $GITHUB_OUTPUT
+            echo "No bulletins were updated."
+          fi
+
+      - name: Commit and Push changes
+        if: steps.process_bulletins.outputs.has_update == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          git add data/
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          UPDATED_SUMMARY="${{ steps.process_bulletins.outputs.updated_summary }}"
+          
+          git commit -m "Update JTWC bulletins: ${UPDATED_SUMMARY} (${TIMESTAMP})"
+          git push
