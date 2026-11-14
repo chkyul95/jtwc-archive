@@ -25,10 +25,24 @@ jobs:
           
           TARGETS=()
           TARGETS+=("ab:abpw10")
+          TARGETS+=("ab:abio10")
+          
           for i in {1..6}; do
             TARGETS+=("wt:wtpn3${i}")  # TC Warning
             TARGETS+=("wd:wdpn3${i}")  # Prognostic Reasoning
             TARGETS+=("wt:wtpn2${i}")  # TCFA
+          done
+
+          for i in {1..6}; do
+            TARGETS+=("wt:wtps3${i}")  # TC Warning
+            TARGETS+=("wd:wdps3${i}")  # Prognostic Reasoning
+            TARGETS+=("wd:wtps2${i}")  # TCFA
+          done
+
+          for i in {1..6}; do
+            TARGETS+=("wt:wtxs3${i}")  # TC Warning
+            TARGETS+=("wd:wdxs3${i}")  # Prognostic Reasoning
+            TARGETS+=("wd:wtxs2${i}")  # TCFA
           done
 
           YEAR=$(date -u +'%Y')
