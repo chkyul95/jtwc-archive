@@ -36,13 +36,13 @@ jobs:
           for i in {1..6}; do
             TARGETS+=("wt:wtps3${i}")  # TC Warning
             TARGETS+=("wd:wdps3${i}")  # Prognostic Reasoning
-            TARGETS+=("wd:wtps2${i}")  # TCFA
+            TARGETS+=("wt:wtps2${i}")  # TCFA
           done
 
           for i in {1..6}; do
             TARGETS+=("wt:wtxs3${i}")  # TC Warning
             TARGETS+=("wd:wdxs3${i}")  # Prognostic Reasoning
-            TARGETS+=("wd:wtxs2${i}")  # TCFA
+            TARGETS+=("wt:wtxs2${i}")  # TCFA
           done
 
           YEAR=$(date -u +'%Y')
