@@ -45,6 +45,12 @@ jobs:
             TARGETS+=("wt:wtxs2${i}")  # TCFA
           done
 
+          for i in {1..6}; do
+            TARGETS+=("wt:wtio3${i}")  # TC Warning
+            TARGETS+=("wd:wdio3${i}")  # Prognostic Reasoning
+            TARGETS+=("wt:wtio2${i}")  # TCFA
+          done
+
           YEAR=$(date -u +'%Y')
           MONTH=$(date -u +'%m')
           TIMESTAMP=$(date -u +'%Y%m%d_%H%M%S')
